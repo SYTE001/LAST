@@ -1,0 +1,227 @@
+/* ═══════════════════════════════════════
+   NOVAA PUBLIC — script.js
+   Fetch live data dari Google Apps Script
+   Alur: Ketik kode → langsung tampil produk
+═══════════════════════════════════════ */
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbwCUlWJJMOXG3nUsYRwUQIFqc-eOkGMGFZBtAjTQkyv2tcP6cnMAg2BytBlj3aCAbBG/exec';
+
+const TAG_LABELS = {
+  mall: '🏬 Mall', diskon: '🔥 Diskon', best: '⭐ Best Seller',
+  baru: '✨ Baru', terlaris: '📦 Terlaris', flash: '⚡ Flash Sale', free: '🚚 Free Ongkir'
+};
+
+/* ── STATE ── */
+let FOLDERS = [];
+let PRODUCTS = [];
+let dataReady = false;
+let activeFolder = null;
+let page = 0;
+const PAGE = 20;
+let loading = false;
+let done = false;
+
+/* ── ELEMENTS ── */
+const $ = id => document.getElementById(id);
+const searchEl = $('searchInput');
+const clearBtn = $('clearBtn');
+const homeView = $('homeView');
+const stateView = $('stateView');
+const folderHeader = $('folderHeader');
+const fhEmoji = $('fhEmoji');
+const fhCode = $('fhCode');
+const fhName = $('fhName');
+const notFoundView = $('notFoundView');
+const notFoundCode = $('notFoundCode');
+const productCountBar = $('productCountBar');
+const productCountLbl = $('productCountLabel');
+const resultView = $('resultView');
+const productGrid = $('productGrid');
+const spinner = $('spinner');
+
+/* ── INIT: Fetch API ── */
+async function initData() {
+  try {
+    const url = `${API_URL}?action=get`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'API error');
+    FOLDERS = data.folders || [];
+    PRODUCTS = data.products || [];
+    dataReady = true;
+  } catch (e) {
+    console.error('API Error:', e);
+    dataReady = false;
+  }
+}
+
+/* ── VIEWS ── */
+function showHome() {
+  homeView.style.display = 'flex';
+  stateView.style.display = 'none';
+  resultView.style.display = 'none';
+  clearBtn.style.display = 'none';
+  activeFolder = null;
+}
+
+function showNotFound(q) {
+  homeView.style.display = 'none';
+  stateView.style.display = 'block';
+  folderHeader.style.display = 'none';
+  productCountBar.style.display = 'none';
+  notFoundView.style.display = 'block';
+  notFoundCode.textContent = q;
+  resultView.style.display = 'none';
+  productGrid.innerHTML = '';
+}
+
+function showFolder(folder) {
+  activeFolder = folder;
+  page = 0; done = false;
+  productGrid.innerHTML = '';
+
+  // Update header
+  fhEmoji.textContent = folder.emoji || '📁';
+  fhCode.textContent = folder.code;
+  fhName.textContent = folder.name || '';
+  // Hide name element if empty
+  fhName.style.display = folder.name ? 'block' : 'none';
+
+  const products = PRODUCTS.filter(p => p.folder_id === folder.folder_id);
+  productCountLbl.textContent = `${products.length} produk`;
+
+  homeView.style.display = 'none';
+  stateView.style.display = 'block';
+  folderHeader.style.display = 'block';
+  notFoundView.style.display = 'none';
+  productCountBar.style.display = 'block';
+  resultView.style.display = 'block';
+
+  loadPage();
+}
+
+/* ── SEARCH ── */
+let debounce;
+
+searchEl.addEventListener('input', () => {
+  const q = searchEl.value.trim();
+  clearBtn.style.display = q ? 'block' : 'none';
+  clearTimeout(debounce);
+
+  if (!q) { showHome(); return; }
+  if (!dataReady) return;
+
+  debounce = setTimeout(() => {
+    // Search by exact code first, then partial match
+    const hits = FOLDERS.filter(f => {
+      const code = String(f.code);
+      const name = f.name ? f.name.toLowerCase() : '';
+      return code === q || code.startsWith(q) || name.includes(q.toLowerCase());
+    });
+
+    if (!hits.length) {
+      showNotFound(q);
+    } else if (hits.length === 1) {
+      // Exact single match → langsung tampil produk
+      showFolder(hits[0]);
+    } else {
+      // Multiple matches → tampil folder pertama yang exact match
+      const exact = hits.find(f => String(f.code) === q);
+      showFolder(exact || hits[0]);
+    }
+  }, 350);
+});
+
+clearBtn.addEventListener('click', () => {
+  searchEl.value = '';
+  clearBtn.style.display = 'none';
+  searchEl.focus();
+  showHome();
+});
+
+/* ── INFINITE SCROLL ── */
+function fmtPrice(n) {
+  return String(n || '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function loadPage() {
+  if (loading || done || !activeFolder) return;
+  loading = true;
+  spinner.style.display = 'flex';
+
+  setTimeout(() => {
+    const all = PRODUCTS.filter(p => p.folder_id === activeFolder.folder_id);
+    const start = page * PAGE;
+    const chunk = all.slice(start, start + PAGE);
+
+    if (!chunk.length) {
+      done = true;
+      spinner.style.display = 'none';
+      loading = false;
+      if (page === 0) {
+        productGrid.innerHTML = `<div class="empty-msg"><div class="big">📦</div>Belum ada produk di folder ini.</div>`;
+      }
+      return;
+    }
+
+    chunk.forEach((p, i) => {
+      const el = buildCard(p);
+      productGrid.appendChild(el);
+      setTimeout(() => el.classList.add('v'), i * 35);
+    });
+
+    observeImages();
+    page++;
+    if (start + PAGE >= all.length) done = true;
+    spinner.style.display = 'none';
+    loading = false;
+  }, 100);
+}
+
+function buildCard(p) {
+  const el = document.createElement('article');
+  el.className = 'card fi';
+  const tagList = p.tags ? String(p.tags).split(',').filter(Boolean) : [];
+  el.innerHTML = `
+    <div class="card-img">
+      ${p.image_url ? `<img data-src="${p.image_url}" alt="${p.product_name}">` : ''}
+    </div>
+    <div class="tag-row">${tagList.map(t => `<span class="tag ${t.trim()}">${TAG_LABELS[t.trim()] || t}</span>`).join('')}</div>
+    <div class="card-body">
+      <div class="card-name">${p.product_name}</div>
+      <div class="card-price">Rp ${fmtPrice(p.price)}${p.old_price ? `<span class="card-price-old">Rp ${fmtPrice(p.old_price)}</span>` : ''}</div>
+      <button class="card-btn">Beli Sekarang →</button>
+    </div>`;
+  el.querySelector('.card-btn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (p.affiliate_link) window.open(p.affiliate_link, '_blank');
+  });
+  return el;
+}
+
+let imgObs;
+function observeImages() {
+  if (!imgObs) {
+    imgObs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        const img = e.target;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          img.onload = () => img.classList.add('show');
+          imgObs.unobserve(img);
+        }
+      });
+    }, { rootMargin: '160px' });
+  }
+  document.querySelectorAll('img[data-src]').forEach(img => imgObs.observe(img));
+}
+
+new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) loadPage();
+}, { rootMargin: '200px' }).observe($('sentinel'));
+
+/* ── START ── */
+initData();
+showHome();
