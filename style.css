@@ -451,3 +451,48 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ── SKELETON ── */
+.skeleton-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.skeleton-img, .skeleton-line, .skeleton-btn {
+  background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.skeleton-img {
+  width: 100%;
+  aspect-ratio: 1/1;
+}
+
+.skeleton-body {
+  padding: 12px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeleton-btn {
+  height: 34px;
+  border-radius: var(--rs);
+  margin-top: 6px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

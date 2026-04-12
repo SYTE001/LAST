@@ -60,6 +60,27 @@ async function initData() {
 }
 
 /* ── VIEWS ── */
+function showSkeleton() {
+  homeView.style.display = 'none';
+  stateView.style.display = 'block';
+  folderHeader.style.display = 'none';
+  notFoundView.style.display = 'none';
+  productCountBar.style.display = 'none';
+  resultView.style.display = 'block';
+  
+  productGrid.innerHTML = Array(4).fill(0).map(() => `
+    <article class="card skeleton-card">
+      <div class="skeleton-img"></div>
+      <div class="skeleton-body">
+         <div class="skeleton-line" style="width: 80%;"></div>
+         <div class="skeleton-line" style="width: 50%;"></div>
+         <div class="skeleton-line" style="width: 35%; margin-top: 4px;"></div>
+         <div class="skeleton-btn"></div>
+      </div>
+    </article>
+  `).join('');
+}
+
 function showHome() {
   homeView.style.display = 'flex';
   stateView.style.display = 'none';
@@ -113,6 +134,9 @@ searchEl.addEventListener('input', () => {
   clearTimeout(debounce);
 
   if (!q) { showHome(); return; }
+  
+  showSkeleton(); // Tampilkan skeleton saat mengetik / menunda hasil
+
   if (!dataReady) return;
 
   debounce = setTimeout(() => {
