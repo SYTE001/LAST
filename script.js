@@ -50,6 +50,9 @@ async function initData() {
     FOLDERS = data.folders || [];
     PRODUCTS = data.products || [];
     dataReady = true;
+    // Replay pending search if user typed before data was ready
+    const pending = searchEl.value.trim();
+    if (pending) searchEl.dispatchEvent(new Event('input'));
   } catch (e) {
     console.error('API Error:', e);
     dataReady = false;
