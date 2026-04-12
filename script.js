@@ -15,6 +15,8 @@ const TAG_LABELS = {
 let FOLDERS = [];
 let PRODUCTS = [];
 let dataReady = false;
+let dataLoading = true;
+let dataError = '';
 let activeFolder = null;
 let page = 0;
 const PAGE = 20;
@@ -41,14 +43,17 @@ const spinner = $('spinner');
 
 /* ── INIT: Fetch API ── */
 async function initData() {
+  dataLoading = true;
+  dataError = '';
   try {
     const url = `${API_URL}?action=get`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    const raw = await res.json();
+    const data = raw && typeof raw === 'object' ? raw : {};
     if (!data.ok) throw new Error(data.error || 'API error');
-    FOLDERS = data.folders || [];
-    PRODUCTS = data.products || [];
+    FOLDERS = Array.isArray(data.folders) ? data.folders : [];
+    PRODUCTS = Array.isArray(data.products) ? data.products : [];
     dataReady = true;
     // Replay pending search if user typed before data was ready
     const pending = searchEl.value.trim();
@@ -56,6 +61,9 @@ async function initData() {
   } catch (e) {
     console.error('API Error:', e);
     dataReady = false;
+    dataError = 'Gagal load data';
+  } finally {
+    dataLoading = false;
   }
 }
 
@@ -100,6 +108,16 @@ function showNotFound(q) {
   productGrid.innerHTML = '';
 }
 
+function showError(msg = 'Gagal load data') {
+  homeView.style.display = 'none';
+  stateView.style.display = 'block';
+  folderHeader.style.display = 'none';
+  productCountBar.style.display = 'none';
+  resultView.style.display = 'block';
+  notFoundView.style.display = 'none';
+  productGrid.innerHTML = `<div class="empty-msg">${msg}</div>`;
+}
+
 function showFolder(folder) {
   activeFolder = folder;
   page = 0; done = false;
@@ -134,10 +152,18 @@ searchEl.addEventListener('input', () => {
   clearTimeout(debounce);
 
   if (!q) { showHome(); return; }
-  
-  showSkeleton(); // Tampilkan skeleton saat mengetik / menunda hasil
 
-  if (!dataReady) return;
+  if (dataLoading) {
+    showSkeleton(); // Tampilkan skeleton saat data masih dimuat
+    return;
+  }
+
+  if (dataError || !dataReady) {
+    showError(dataError || 'Gagal load data');
+    return;
+  }
+
+  showSkeleton(); // Tampilkan skeleton saat mengetik / menunda hasil
 
   debounce = setTimeout(() => {
     // Search by exact code first, then partial match
@@ -176,18 +202,17 @@ function loadPage() {
   if (loading || done || !activeFolder) return;
   loading = true;
   spinner.style.display = 'flex';
-
-  setTimeout(() => {
-    const all = PRODUCTS.filter(p => p.folder_id === activeFolder.folder_id);
+  try {
+    const all = Array.isArray(PRODUCTS)
+      ? PRODUCTS.filter(p => p && p.folder_id === activeFolder.folder_id)
+      : [];
     const start = page * PAGE;
     const chunk = all.slice(start, start + PAGE);
 
     if (!chunk.length) {
       done = true;
-      spinner.style.display = 'none';
-      loading = false;
       if (page === 0) {
-        productGrid.innerHTML = `<div class="empty-msg"><div class="big">📦</div>Belum ada produk di folder ini.</div>`;
+        productGrid.innerHTML = '<div class="empty-msg">Tidak ada produk</div>';
       }
       return;
     }
@@ -201,9 +226,16 @@ function loadPage() {
     observeImages();
     page++;
     if (start + PAGE >= all.length) done = true;
+  } catch (e) {
+    console.error('Load page error:', e);
+    done = true;
+    if (page === 0) {
+      productGrid.innerHTML = '<div class="empty-msg">Gagal load data</div>';
+    }
+  } finally {
     spinner.style.display = 'none';
     loading = false;
-  }, 100);
+  }
 }
 
 function buildCard(p) {
