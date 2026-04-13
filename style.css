@@ -366,10 +366,11 @@ body {
 
 .card-price-old {
   font-size: 11px;
-  color: var(--dim);
+  color: #9ca3af;
   text-decoration: line-through;
+  text-decoration-color: rgba(156, 163, 175, 0.85);
   font-weight: 400;
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 .card-btn {
