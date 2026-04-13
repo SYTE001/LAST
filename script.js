@@ -251,13 +251,22 @@ function loadPage() {
   }
 }
 
+function getOptimizedImageUrl(url) {
+  if (!url) return '';
+  if (url.includes('format=webp')) return url;
+  const hasQuery = url.includes('?');
+  const withFormat = `${url}${hasQuery ? '&' : '?'}format=webp`;
+  return /\.(jpe?g|png)(\?.*)?$/i.test(url) ? url.replace(/\.(jpe?g|png)(\?.*)?$/i, '.webp$2') : withFormat;
+}
+
 function buildCard(p) {
   const el = document.createElement('article');
   el.className = 'card fi';
   const tagList = p.tags ? String(p.tags).split(',').filter(Boolean) : [];
+  const optimizedImageUrl = getOptimizedImageUrl(p.image_url);
   el.innerHTML = `
     <div class="card-img">
-      ${p.image_url ? `<img data-src="${p.image_url}" alt="${p.product_name}">` : ''}
+      ${p.image_url ? `<img data-src="${optimizedImageUrl}" data-fallback-src="${p.image_url}" alt="${p.product_name}" loading="lazy" decoding="async">` : ''}
     </div>
     <div class="tag-row">${tagList.map(t => `<span class="tag ${t.trim()}">${TAG_LABELS[t.trim()] || t}</span>`).join('')}</div>
     <div class="card-body">
@@ -281,6 +290,10 @@ function observeImages() {
         const img = e.target;
         if (img.dataset.src) {
           img.src = img.dataset.src;
+          img.onerror = () => {
+            if (!img.dataset.fallbackSrc || img.src === img.dataset.fallbackSrc) return;
+            img.src = img.dataset.fallbackSrc;
+          };
           img.onload = () => img.classList.add('show');
           imgObs.unobserve(img);
         }
