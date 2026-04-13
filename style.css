@@ -17,10 +17,11 @@ body {
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
-  max-width: 480px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   position: relative;
-  box-shadow: 0 0 100px rgba(0, 0, 0, 0.8);
+  overflow-x: hidden;
 }
 
 :root {
@@ -49,8 +50,6 @@ body {
   padding: 10px 16px;
   gap: 10px;
   background: rgba(13, 13, 13, 0.95);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   width: 100%;
 }
@@ -73,13 +72,12 @@ body {
   border-radius: 100px;
   padding: 7px 14px;
   flex: 1;
-  max-width: 240px;
-  transition: border-color .15s, max-width .25s ease;
+  min-width: 0;
+  transition: border-color .15s ease;
 }
 
 .search-pill:focus-within {
   border-color: rgba(201, 169, 110, 0.4);
-  max-width: 280px;
 }
 
 .search-pill svg {
@@ -239,7 +237,8 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  padding: 12px;
+  width: 100%;
+  padding: 0;
   animation: fadeScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
