@@ -49,21 +49,29 @@ async function initData() {
     const url = `${API_URL}?action=get`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const raw = await res.json();
+    
+    let raw;
+    try {
+      raw = await res.json();
+    } catch (err) {
+      throw new Error('Data format tidak valid');
+    }
+    
     const data = raw && typeof raw === 'object' ? raw : {};
-    if (!data.ok) throw new Error(data.error || 'API error');
+    if (!data.ok) throw new Error(data.error || 'Server error');
+    
     FOLDERS = Array.isArray(data.folders) ? data.folders : [];
     PRODUCTS = Array.isArray(data.products) ? data.products : [];
     dataReady = true;
-    // Replay pending search if user typed before data was ready
-    const pending = searchEl.value.trim();
-    if (pending) searchEl.dispatchEvent(new Event('input'));
   } catch (e) {
     console.error('API Error:', e);
     dataReady = false;
     dataError = 'Gagal load data';
   } finally {
     dataLoading = false;
+    // Replay pending search if user typed before data was ready
+    const pending = searchEl.value.trim();
+    if (pending) searchEl.dispatchEvent(new Event('input'));
   }
 }
 
@@ -154,7 +162,7 @@ searchEl.addEventListener('input', () => {
   if (!q) { showHome(); return; }
 
   if (dataLoading) {
-    showSkeleton(); // Tampilkan skeleton saat data masih dimuat
+    showSkeleton();
     return;
   }
 
@@ -163,25 +171,30 @@ searchEl.addEventListener('input', () => {
     return;
   }
 
-  showSkeleton(); // Tampilkan skeleton saat mengetik / menunda hasil
+  showSkeleton();
 
   debounce = setTimeout(() => {
-    // Search by exact code first, then partial match
-    const hits = FOLDERS.filter(f => {
-      const code = String(f.code);
-      const name = f.name ? f.name.toLowerCase() : '';
-      return code === q || code.startsWith(q) || name.includes(q.toLowerCase());
-    });
+    try {
+      // Search by exact code first, then partial match
+      // folder.code bisa number atau string dari API, normalisasi ke string
+      const hits = FOLDERS.filter(f => {
+        if (!f || typeof f !== 'object') return false;
+        const code = String(f.code || '');
+        const name = (f.name != null) ? String(f.name).toLowerCase() : '';
+        return code === q || code.startsWith(q) || name.includes(q.toLowerCase());
+      });
 
-    if (!hits.length) {
-      showNotFound(q);
-    } else if (hits.length === 1) {
-      // Exact single match → langsung tampil produk
-      showFolder(hits[0]);
-    } else {
-      // Multiple matches → tampil folder pertama yang exact match
-      const exact = hits.find(f => String(f.code) === q);
-      showFolder(exact || hits[0]);
+      if (!hits.length) {
+        showNotFound(q);
+      } else if (hits.length === 1) {
+        showFolder(hits[0]);
+      } else {
+        const exact = hits.find(f => String(f.code) === q);
+        showFolder(exact || hits[0]);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      showError('Gagal mencari produk');
     }
   }, 350);
 });
