@@ -263,8 +263,7 @@ body {
   overflow: hidden;
   cursor: pointer;
   transition: transform .12s ease;
-  contain: layout style;
-  will-change: transform;
+  contain: layout;
 }
 
 .card:active {
