@@ -242,6 +242,19 @@ body {
   animation: fadeScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@media (min-width: 1024px) {
+  #resultView {
+    width: min(1280px, 100%);
+    margin: 0 auto;
+    padding: 0 14px 24px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
 /* ── CARD ── */
 .card {
   background: var(--s1);
