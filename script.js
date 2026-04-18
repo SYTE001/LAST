@@ -14,6 +14,7 @@ const TAG_LABELS = {
 /* ── STATE ── */
 let FOLDERS = [];
 let PRODUCTS = [];
+const imageUrlSet = new Set();
 let dataReady = false;
 let dataLoading = true;
 let dataError = '';
@@ -40,6 +41,70 @@ const productCountLbl = $('productCountLabel');
 const resultView = $('resultView');
 const productGrid = $('productGrid');
 const spinner = $('spinner');
+const imageUrlInput = $('imageUrlInput');
+const addProductBtn = $('addProductBtn');
+const productMessageEl = $('productMessage');
+
+/* ── IMAGE URL DEDUP ── */
+function normalizeImageUrl(url) {
+  const raw = String(url ?? '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    parsed.hostname = parsed.hostname.toLowerCase();
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch (_) {
+    // URL invalid -> tetap boleh dipakai, cukup trim
+    return raw;
+  }
+}
+
+function initImageUrlSet(products) {
+  imageUrlSet.clear();
+  if (!Array.isArray(products)) return;
+
+  products.forEach(product => {
+    const normalized = normalizeImageUrl(product?.image_url);
+    if (normalized) imageUrlSet.add(normalized);
+  });
+}
+
+function showProductMessage(message) {
+  if (productMessageEl) {
+    productMessageEl.textContent = message;
+    productMessageEl.style.display = message ? 'block' : 'none';
+  } else if (message) {
+    alert(message);
+  }
+}
+
+function canUseImageUrl(imageUrl) {
+  const normalizedImageUrl = normalizeImageUrl(imageUrl);
+  if (!normalizedImageUrl) {
+    showProductMessage('Image URL wajib diisi');
+    return { ok: false, normalizedImageUrl: '' };
+  }
+
+  if (imageUrlSet.has(normalizedImageUrl)) {
+    showProductMessage('Gambar sudah digunakan di produk lain');
+    return { ok: false, normalizedImageUrl };
+  }
+
+  showProductMessage('');
+  return { ok: true, normalizedImageUrl };
+}
+
+function addProduct(newProduct) {
+  const { ok, normalizedImageUrl } = canUseImageUrl(newProduct?.image_url);
+  if (!ok) return false;
+
+  PRODUCTS.push(newProduct);
+  imageUrlSet.add(normalizedImageUrl);
+  return true;
+}
 
 /* ── INIT: Fetch API ── */
 async function initData() {
@@ -62,6 +127,7 @@ async function initData() {
     
     FOLDERS = Array.isArray(data.folders) ? data.folders : [];
     PRODUCTS = Array.isArray(data.products) ? data.products : [];
+    initImageUrlSet(PRODUCTS);
     dataReady = true;
   } catch (e) {
     console.error('API Error:', e);
@@ -205,6 +271,30 @@ clearBtn.addEventListener('click', () => {
   searchEl.focus();
   showHome();
 });
+
+if (imageUrlInput) {
+  let imageUrlDebounceId = null;
+  imageUrlInput.addEventListener('input', () => {
+    clearTimeout(imageUrlDebounceId);
+    imageUrlDebounceId = setTimeout(() => {
+      const check = canUseImageUrl(imageUrlInput.value);
+      if (check.ok) showProductMessage('');
+    }, 300);
+  });
+}
+
+if (addProductBtn) {
+  addProductBtn.addEventListener('click', () => {
+    const imageUrlValue = imageUrlInput ? imageUrlInput.value : '';
+    const allowed = canUseImageUrl(imageUrlValue);
+    if (!allowed.ok) return;
+
+    // Integrasikan dengan alur tambah produk existing jika ada.
+    // Fallback minimal: tetap menambahkan URL ke cache agar konsisten O(1).
+    imageUrlSet.add(allowed.normalizedImageUrl);
+    showProductMessage('');
+  });
+}
 
 /* ── INFINITE SCROLL ── */
 function fmtPrice(n) {
